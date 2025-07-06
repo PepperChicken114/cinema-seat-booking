@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>弧形影院选座系统</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="logic.js"></script>
+</head>
+<body>
+    <h1>弧形影院选座系统</h1>
+    
+    <div class="container">
+        <div class="form-section">
+            <h2>票务信息</h2>
+            
+            <div class="form-group">
+                <label>票类型:</label>
+                <select id="ticketType">
+                    <option value="individual">个人票</option>
+                    <option value="group">团体票</option>
+                </select>
+            </div>
+            
+            <div id="individualForm">
+                <div class="form-group">
+                    <label for="individualName">姓名:</label>
+                    <input type="text" id="individualName" required>
+                </div>
+                <div class="form-group">
+                    <label for="individualAge">年龄:</label>
+                    <input type="number" id="individualAge" min="1" max="120" required>
+                </div>
+            </div>
+            
+            <div id="groupForm" style="display: none;">
+                <div class="form-group">
+                    <label for="groupSize">人数 (最多20人):</label>
+                    <input type="number" id="groupSize" min="2" max="20" required>
+                </div>
+                <div class="form-group">
+                    <button type="button" id="addMembersBtn">添加成员信息</button>
+                </div>
+                <div id="groupMembers" class="group-members">
+                    <!-- 成员信息将在这里动态添加 -->
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>选座方式:</label>
+                <div>
+                    <button type="button" id="autoSelectBtn">自动选座</button>
+                    <button type="button" id="manualSelectBtn">手动选座</button>
+                    <button type="button" id="resetBtn">重置选择</button>
+                </div>
+            </div>
+            
+            <div id="errorMsg" class="error"></div>
+        </div>
+        
+        <div class="seat-section">
+            <h2>座位选择</h2>
+            <div class="screen">银幕</div>
+            
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #4CAF50;"></div>
+                    <span>可选</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #FFEB3B;"></div>
+                    <span>已选</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #F44336;"></div>
+                    <span>已售</span>
+                </div>
+            </div>
+            
+            <!-- 这是显示座位图的关键部分 -->
+            <canvas id="cinemaCanvas" width="700" height="500"></canvas>
+            
+            <div id="ticketInfo" class="ticket-info" style="display: none;">
+                <h3>票务信息</h3>
+                <div id="ticketDetails"></div>
+                <button type="button" id="confirmBtn">确认购票</button>
+            </div>
+        </div>
+    </div>
+
+    
+</body>
+</html>
