@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>电影院座位图</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+        .controls {
+            margin-bottom: 20px;
+        }
+        #seatCount {
+            width: 60px;
+            padding: 5px;
+        }
+        #cinemaCanvas {
+            border: 1px solid #ccc;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .legend {
+            display: flex;
+            margin-top: 20px;
+            gap: 20px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+        }
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            margin-right: 5px;
+            border: 1px solid #333;
+        }
+    </style>
+</head>
+<body>
+    <h1>电影院座位图</h1>
+    
+    <div class="controls">
+        <label for="seatCount">座位总数 (1-300):</label>
+        <input type="number" id="seatCount" min="1" max="300" value="200">
+        <button onclick="drawCinema()">更新座位图</button>
+    </div>
+    
+    <canvas id="cinemaCanvas" width="800" height="500"></canvas>
+    
+    <div class="legend">
+        <div class="legend-item">
+            <div class="legend-color" style="background-color: #4CAF50;"></div>
+            <span>空座</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background-color: #FFEB3B;"></div>
+            <span>选中</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background-color: #F44336;"></div>
+            <span>已售</span>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('cinemaCanvas');
+        const ctx = canvas.getContext('2d');
+        let seats = [];
+        let soldSeats = new Set();
+        let selectedSeats = new Set();
+
+        // 初始化已售座位（暂时先随机生成一些）
+        function initSoldSeats(totalSeats) {
+            soldSeats = new Set();
+            const soldCount = Math.floor(totalSeats * 0.2); // 20%座位已售
+            while (soldSeats.size < soldCount) {
+                const seatNum = Math.floor(Math.random() * totalSeats) + 1;
+                soldSeats.add(seatNum);
+            }
+        }
+
+
+            
+         // 绘制弧形排列的座位
+        function drawCinema() {
+        const totalSeats = parseInt(document.getElementById('seatCount').value);
+        if (isNaN(totalSeats) || totalSeats < 1 || totalSeats > 300) {
+            alert('请输入1-300之间的数字');
+            return;
+        }
+
+        initSoldSeats(totalSeats);
+        selectedSeats = new Set();
+        
+        const seatsPerRow = 20;
+        const rowCount = Math.ceil(totalSeats / seatsPerRow);
+        const lastRowSeats = totalSeats % seatsPerRow || seatsPerRow;
+        
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // 绘制屏幕
+        ctx.fillStyle = '#333';
+        ctx.beginPath();
+        ctx.ellipse(canvas.width/2, 50, 300, 20, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#666';
+        ctx.font = '16px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('屏幕', canvas.width/2, 50);
+        
+        // 绘制座位
+        const centerX = canvas.width / 2;
+        const startY = 100;
+        const seatRadius = 15;
+        const rowSpacing = 30;
+        const arcHeight = 10; // 弧形高度
+        
+        // 统一的起始和结束X坐标（所有排相同）
+        const startX = 150;
+        const endX = canvas.width - 150;
+        
+        seats = [];
+        
+        for (let row = 0; row < rowCount; row++) {
+            const seatsInRow = (row === rowCount - 1) ? lastRowSeats : seatsPerRow;
+            const rowY = startY + row * rowSpacing;
+            
+            // 所有排使用相同的X坐标范围
+            const seatSpacing = (endX - startX) / (seatsInRow - 1);
+            const centerSeat = Math.floor(seatsInRow / 2);
+            
+            for (let seat = 0; seat < seatsInRow; seat++) {
+                const seatNum = row * seatsPerRow + seat + 1;
+                const seatX = startX + seat * seatSpacing;
+                // 计算Y偏移量，形成开口向上的弧形
+                const distanceFromCenter = Math.abs(seat - centerSeat);
+                const seatY = rowY + (arcHeight * (1 - distanceFromCenter / centerSeat));
+                
+                // 保存座位位置信息
+                seats.push({
+                    x: seatX,
+                    y: seatY,
+                    num: seatNum,
+                    row: row + 1
+                });
+                
+                // 绘制座位
+                if (soldSeats.has(seatNum)) {
+                    ctx.fillStyle = '#F44336'; // 已售 - 红色
+                } else if (selectedSeats.has(seatNum)) {
+                    ctx.fillStyle = '#FFEB3B'; // 选中 - 黄色
+                } else {
+                    ctx.fillStyle = '#4CAF50'; // 空座 - 绿色
+                }
+                
+                ctx.beginPath();
+                ctx.arc(seatX, seatY, seatRadius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+                
+                // 绘制座位号
+                ctx.fillStyle = '#000';
+                ctx.font = '10px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(`${row + 1}-${seat + 1}`, seatX, seatY + 3);
+            }
+        }
+    }
+
+        // 处理座位点击
+        canvas.addEventListener('click', function(e) {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            for (const seat of seats) {
+                const distance = Math.sqrt((x - seat.x) ** 2 + (y - seat.y) ** 2);
+                if (distance <= 15 && !soldSeats.has(seat.num)) {
+                    if (selectedSeats.has(seat.num)) {
+                        selectedSeats.delete(seat.num);
+                    } else {
+                        selectedSeats.add(seat.num);
+                    }
+                    drawCinema();
+                    break;
+                }
+            }
+        });
+
+        // 初始绘制
+        drawCinema();
+    </script>
+</body>
+</html>
