@@ -20,6 +20,9 @@
                     <option value="individual">个人票</option>
                     <option value="group">团体票</option>
                 </select>
+                <div class="ticket-limit-info">
+                    <small>个人票限制：同一客户只能有一个活跃订单</small>
+                </div>
             </div>
             
             <div id="individualForm">
@@ -55,7 +58,49 @@
                 </div>
             </div>
             
+            <div class="form-group">
+                <label>票务操作:</label>
+                <div class="ticket-operations">
+                    <button type="button" id="reserveBtn" class="operation-btn reserve-btn">预订票</button>
+                    <button type="button" id="purchaseBtn" class="operation-btn purchase-btn">直接购票</button>
+                    <button type="button" id="payBtn" class="operation-btn pay-btn" style="display: none;">付款</button>
+                    <button type="button" id="cancelBtn" class="operation-btn cancel-btn" style="display: none;">取消预定</button>
+                    <button type="button" id="refundBtn" class="operation-btn refund-btn" style="display: none;">退票</button>
+                </div>
+            </div>
+            
+            <!-- 添加历史订单按钮 -->
+            <div class="form-group">
+                <button type="button" id="toggleHistoryBtn" class="operation-btn history-btn">查看历史订单</button>
+            </div>
+            
             <div id="errorMsg" class="error"></div>
+            
+            <div id="ticketStatus" class="ticket-status" style="display: none;">
+                <h3>当前订单状态</h3>
+                <div id="statusDetails"></div>
+            </div>
+            
+            <div id="orderHistory" class="order-history" style="display: none;">
+                <h3>历史订单
+                    <button id="closeHistoryBtn" class="close-btn">×</button>
+                </h3>
+                <div class="history-filters">
+                    <select id="statusFilter">
+                        <option value="all">所有状态</option>
+                        <option value="reserved">已预订</option>
+                        <option value="paid">已付款</option>
+                        <option value="cancelled">已取消</option>
+                        <option value="refunded">已退票</option>
+                    </select>
+                    <select id="typeFilter">
+                        <option value="all">所有类型</option>
+                        <option value="individual">个人票</option>
+                        <option value="group">团体票</option>
+                    </select>
+                </div>
+                <div id="historyList"></div>
+            </div>
         </div>
         
         <div class="seat-section">
@@ -75,19 +120,20 @@
                     <div class="legend-color" style="background-color: #F44336;"></div>
                     <span>已售</span>
                 </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #FF9800;"></div>
+                    <span>已预订</span>
+                </div>
             </div>
             
-            <!-- 这是显示座位图的关键部分 -->
             <canvas id="cinemaCanvas" ></canvas>
             
             <div id="ticketInfo" class="ticket-info" style="display: none;">
                 <h3>票务信息</h3>
                 <div id="ticketDetails"></div>
-                <button type="button" id="confirmBtn">确认购票</button>
+                <!-- <button type="button" id="confirmBtn" >确认购票</button> -->
             </div>
         </div>
     </div>
-
-    
 </body>
 </html>
