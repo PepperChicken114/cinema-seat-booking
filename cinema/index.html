@@ -14,12 +14,28 @@
         <div class="form-section">
             <h2>票务信息</h2>
             
+            
+            <div class="form-group">
+                <label>影院配置:</label>
+                <div class="cinema-config">
+                    <input type="number" id="cinemaCapacity" min="100" max="500" step="20" value="400" placeholder="影院总座位数">
+                    <button type="button" id="applyCinemaBtn" class="config-btn">应用配置</button>
+                </div>
+                <div class="config-info">
+                    <small>请输入影院总座位数（20的整数倍，每排20座）</small>
+                </div>
+            </div>
+            
             <div class="form-group">
                 <label>票类型:</label>
                 <select id="ticketType">
                     <option value="individual">个人票</option>
                     <option value="group">团体票</option>
                 </select>
+                <!-- 新增提示元素 -->
+                <div id="multiSelectHint" class="hint" style="display: none;">
+                    <small>提示：按住 <kbd>Ctrl</kbd> 键点击可多选座位</small>
+                </div>
                 <div class="ticket-limit-info">
                     <small>个人票限制：同一客户只能有一个活跃订单</small>
                 </div>
@@ -105,7 +121,12 @@
         
         <div class="seat-section">
             <h2>座位选择</h2>
-            <div class="screen">银幕</div>
+            <div class="cinema-info">
+                <div class="capacity-display">
+                    当前影院：<span id="currentCapacity">400</span>座 
+                    (<span id="currentRows">20</span>排 × 20座)
+                </div>
+            </div>
             
             <div class="legend">
                 <div class="legend-item">
@@ -126,12 +147,14 @@
                 </div>
             </div>
             
-            <canvas id="cinemaCanvas" ></canvas>
+            
+            <div class="seat-canvas-container">
+                <canvas id="cinemaCanvas"></canvas>
+            </div>
             
             <div id="ticketInfo" class="ticket-info" style="display: none;">
                 <h3>票务信息</h3>
                 <div id="ticketDetails"></div>
-                <!-- <button type="button" id="confirmBtn" >确认购票</button> -->
             </div>
         </div>
     </div>

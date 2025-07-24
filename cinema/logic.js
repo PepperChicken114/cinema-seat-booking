@@ -2,10 +2,11 @@ document.addEventListener('DOMContentLoaded', function () {
     const canvas = document.getElementById('cinemaCanvas');
     const ctx = canvas.getContext('2d');
 
-    // 影院配置
+    // 影院配置 -动态配置
     const config = {
-        rows: 10,
-        seatsPerRow: 20,
+        capacity: 400, // 默认400座
+        seatsPerRow: 20, // 固定每排20座
+        get rows() { return this.capacity / this.seatsPerRow; }, // 动态计算行数
         reservedSeats: ['1-1', '1-2', '1-10', '1-20',
             '2-5', '2-15',
             '3-7', '3-8', '3-9',
@@ -19,7 +20,7 @@ document.addEventListener('DOMContentLoaded', function () {
         ticketPrice: 50
     };
 
-    // 重新设计状态管理
+   
     const state = {
         selectedSeats: [],
         reservedSeats: [...config.reservedSeats],
@@ -60,26 +61,110 @@ document.addEventListener('DOMContentLoaded', function () {
         orderHistory: document.getElementById('orderHistory'),
         historyList: document.getElementById('historyList'),
         statusFilter: document.getElementById('statusFilter'),
-        typeFilter: document.getElementById('typeFilter')
+        typeFilter: document.getElementById('typeFilter'),
+        cinemaCapacity: document.getElementById('cinemaCapacity'),
+        applyCinemaBtn: document.getElementById('applyCinemaBtn'),
+        currentCapacity: document.getElementById('currentCapacity'),
+        currentRows: document.getElementById('currentRows')
     };
 
+    
+    function applyCinemaConfig() {
+        const capacity = parseInt(elements.cinemaCapacity.value);
+        
+        // 验证输入
+        if (!capacity || capacity < 100 || capacity > 500) {
+            showError('请输入100-500之间的座位数');
+            return;
+        }
+        
+        if (capacity % 20 !== 0) {
+            showError('座位数必须是20的整数倍');
+            return;
+        }
+        
+        // 检查是否有活跃订单
+        if (state.allBookings.size > 0) {
+            if (!confirm('更改影院配置将清空所有订单，确定要继续吗？')) {
+                return;
+            }
+        }
+        
+        // 更新配置
+        config.capacity = capacity;
+        
+        // 重置所有状态
+        state.selectedSeats = [];
+        state.reservedSeats = [...config.reservedSeats];
+        state.allBookings.clear();
+        state.currentBookingId = null;
+        state.individualBookings.clear();
+        state.isNewBookingMode = true;
+        state.groupMembers = [];
+        
+        // 清空表单
+        elements.individualName.value = '';
+        elements.individualAge.value = '';
+        elements.groupSize.value = '';
+        elements.groupMembers.innerHTML = '';
+        
+        // 更新显示
+        updateCapacityDisplay();
+        
+        // 重新初始化
+        resizeCanvas();
+        updateOperationButtons();
+        updateTicketStatus();
+        elements.ticketInfo.style.display = 'none';
+        hideOrderHistory();
+        clearError();
+        
+        showError(`影院配置已更新：${capacity}座 (${config.rows}排 × 20座)`, 'success');
+    }
+
+    
+    function updateCapacityDisplay() {
+        elements.currentCapacity.textContent = config.capacity;
+        elements.currentRows.textContent = config.rows;
+    }
+
     function resizeCanvas() {
-        const container = document.querySelector('.seat-section');
+        const container = document.querySelector('.seat-canvas-container');
         const canvas = document.getElementById('cinemaCanvas');
-
-        canvas.width = container.clientWidth - 40;
-        canvas.height = 600;
-
+        const ctx = canvas.getContext('2d');
+    
+        if (!container) return;
+    
+        // 获取设备像素比（通常 1 或 2，Retina 屏为 2）
+        const dpr = window.devicePixelRatio || 1;
+    
+        // 1. 设置 canvas 的 CSS 尺寸（逻辑像素）
+        const logicalWidth = container.clientWidth - 20;
+        const baseHeight = 120;
+        const rowHeight = 45;
+        const bottomPadding = 50;
+        const calculatedHeight = baseHeight + (config.rows * rowHeight) + bottomPadding;
+    
+        canvas.style.width = `${logicalWidth}px`;
+        canvas.style.height = `${calculatedHeight}px`;
+    
+        // 2. 设置 canvas 的实际像素尺寸（物理像素）
+        canvas.width = logicalWidth * dpr;
+        canvas.height = calculatedHeight * dpr;
+    
+        // 3. 缩放绘图上下文，避免内容变形
+        ctx.scale(dpr, dpr);
+    
         initializeSeats();
         drawSeatMap();
     }
     resizeCanvas();
 
     window.addEventListener('resize', resizeCanvas);
-
     function initializeSeats() {
         state.seats = [];
-        const centerX = canvas.width / 2;
+        const dpr = window.devicePixelRatio || 1;
+        const centerX = (canvas.width /dpr) /2;
         const startY = 80;
         const rowSpacing = 45;
 
@@ -87,15 +172,17 @@ document.addEventListener('DOMContentLoaded', function () {
             const rowSeats = [];
             const rowY = startY + (row - 1) * rowSpacing;
 
-            const curveFactor = (row - 1) / (config.rows - 1);
+            // 计算弧形参数 - 确保在大行数时也能正常显示
+            const curveFactor = (row - 1) / Math.max(config.rows - 1, 1);
             const baseWidth = 300;
-            const maxWidth = 500;
+            const maxWidth = Math.min(500, canvas.width * 0.8); // 限制最大宽度
             const rowWidth = baseWidth + (maxWidth - baseWidth) * curveFactor;
 
-            const arcHeight = 15 + row * 3;
+            // 弧形高度适应行数
+            const arcHeight = Math.max(10, 15 + row * 2); // 减少弧形高度增长
 
             for (let seatNum = 1; seatNum <= config.seatsPerRow; seatNum++) {
-                const seatSpacing = rowWidth / (config.seatsPerRow - 1);
+                const seatSpacing = rowWidth / Math.max(config.seatsPerRow - 1, 1);
                 const linearX = centerX - rowWidth / 2 + (seatNum - 1) * seatSpacing;
 
                 const normalizedX = (linearX - centerX) / (rowWidth / 2);
@@ -122,14 +209,21 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function handleSeatClick(event) {
+        const isCtrlPressed = event.ctrlKey || event.metaKey;
         if (!state.isNewBookingMode) {
             showError('请先完成当前订单处理或切换到新订单模式');
             return;
         }
 
         const rect = canvas.getBoundingClientRect();
-        const mouseX = event.clientX - rect.left;
-        const mouseY = event.clientY - rect.top;
+        const dpr = window.devicePixelRatio || 1;
+        // 获取Canvas的实际尺寸和显示尺寸
+        const scaleX = (canvas.width/dpr) / rect.width;
+        const scaleY = (canvas.height/dpr) / rect.height;
+        
+        // 计算鼠标在Canvas坐标系中的位置
+        const mouseX = (event.clientX - rect.left) * scaleX;
+        const mouseY = (event.clientY - rect.top) * scaleY;
 
         let clickedSeat = null;
 
@@ -165,10 +259,17 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             } else {
                 const index = state.selectedSeats.indexOf(clickedSeat.id);
-                if (index === -1) {
-                    state.selectedSeats.push(clickedSeat.id);
-                } else {
-                    state.selectedSeats.splice(index, 1);
+                if (isCtrlPressed){
+                    // Ctrl+点击：切换选中状态
+                    if (index === -1) {
+                        state.selectedSeats.push(clickedSeat.id);
+                    } else {
+                        state.selectedSeats.splice(index, 1);
+                    }
+                }
+                else {
+                    // 普通点击：重置为当前点击的座位
+                    state.selectedSeats = [clickedSeat.id];
                 }
             }
 
@@ -213,10 +314,12 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function drawSeatMap() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        const screenWidth = Math.min(canvas.width * 0.8, 500);
-        const screenX = (canvas.width - screenWidth) / 2;
+        const dpr = window.devicePixelRatio || 1;
+        const logicalWidth = canvas.width / dpr;  // 逻辑像素宽度
+        const logicalHeight = canvas.height / dpr;  // 逻辑像素高度
+        ctx.clearRect(0, 0, logicalWidth, logicalHeight);
+        const screenWidth = Math.min(logicalWidth * 0.8, 500);
+        const screenX = (logicalWidth - screenWidth) / 2;
         const screenY = 20;
         const screenHeight = 30;
 
@@ -237,7 +340,7 @@ document.addEventListener('DOMContentLoaded', function () {
         ctx.font = '18px Arial';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText('银幕', canvas.width / 2, screenY + screenHeight / 2);
+        ctx.fillText('银幕', logicalWidth / 2, screenY + screenHeight / 2);
 
         state.seats.forEach(rowSeats => {
             rowSeats.forEach(seat => {
@@ -278,7 +381,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 ctx.lineWidth = 1;
                 ctx.stroke();
 
-                // 修改座位文字显示 - 显示行号和座位号
+                // 显示行号和座位号
                 ctx.fillStyle = '#000';
                 ctx.font = '7px Arial';
                 ctx.textAlign = 'center';
@@ -293,18 +396,22 @@ document.addEventListener('DOMContentLoaded', function () {
                     ctx.fillStyle = '#666';
                     ctx.font = '12px Arial';
                     ctx.textAlign = 'right';
+                    // 描边 + 填充，使文字更清晰
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+                    ctx.lineWidth = 1;
+                    ctx.strokeText(`第${seat.row}排`, seat.x - 20, seat.y);
                     ctx.fillText(`第${seat.row}排`, seat.x - 20, seat.y);
                 }
             });
         });
 
+        // 绘制中间过道线 - 调整长度以适应动态高度
         ctx.strokeStyle = '#ddd';
         ctx.lineWidth = 1;
         ctx.setLineDash([5, 5]);
-
         ctx.beginPath();
-        ctx.moveTo(canvas.width / 2, 60);
-        ctx.lineTo(canvas.width / 2, canvas.height - 20);
+        ctx.moveTo(logicalWidth / 2, 60);
+        ctx.lineTo(logicalWidth / 2, logicalHeight - 30); // 调整底部位置
         ctx.stroke();
 
         ctx.setLineDash([]);
@@ -312,7 +419,18 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function reserveTicket() {
         if (!validateBooking()) return;
+        const validationErrors = validateSeatRules(state.selectedSeats);
+        //console.log("Validation errors:", validationErrors); // 调试2
+        if (validationErrors.length > 0) {
+            const confirmMessage = [
+                "这些座位可能不方便：",
+                ...validationErrors,
+                "是否继续操作？"
+            ].join("\n");
 
+            if (!confirm(confirmMessage)) return;
+        }
+    
         const bookingData = createBookingData();
         bookingData.status = 'reserved';
         bookingData.reservedAt = new Date().toISOString();
@@ -337,7 +455,16 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function purchaseTicket() {
         if (!validateBooking()) return;
+        const validationErrors = validateSeatRules(state.selectedSeats);
+        if (validationErrors.length > 0) {
+            const confirmMessage = [
+                "这些座位可能不方便：",
+                ...validationErrors,
+                "是否继续操作？"
+            ].join("\n");
 
+            if (!confirm(confirmMessage)) return;
+        }
         const bookingData = createBookingData();
         bookingData.status = 'paid';
         bookingData.paidAt = new Date().toISOString();
@@ -489,7 +616,43 @@ document.addEventListener('DOMContentLoaded', function () {
 
         return true;
     }
+    function validateSeatRules(seatIds) {
+        //console.log("Validating seats:", seatIds); // 调试5
+        //console.log("Group members:", state.groupMembers); // 调试6
+        const errors = [];
+        const ticketType = elements.ticketType.value;
+        const isGroup = ticketType === 'group';
 
+        // 获取成员年龄信息（兼容个人票/团体票）
+        const ages = isGroup ? 
+            state.groupMembers.map(m => m.age) : 
+            [parseInt(elements.individualAge.value)];
+
+        // 检查每个座位的规则
+        seatIds.forEach(seatId => {
+            const [rowStr, _] = seatId.split('-');
+            const row = parseInt(rowStr);
+
+            // 少年(15岁以下)不能坐前三排
+            if (ages.some(age => age < 15) && row <= 3) {
+                errors.push(`少年儿童坐在前三排（当前选择：第${row}排）`);
+            }
+
+            // 老年人(60岁以上)不能坐最后三排
+            if (ages.some(age => age > 60) && row > config.rows - 3) {
+                errors.push(`老年人坐在最后三排（当前选择：第${row}排）`);
+            }
+        });
+        // 团体必须同排（仅当团体票且选择超过1个座位时检查）
+        if (isGroup && seatIds.length > 1) {
+            const firstRow = seatIds[0].split('-')[0];
+            if (!seatIds.every(id => id.startsWith(firstRow + '-'))) {
+                errors.push("团体成员未坐在同一排");
+            }
+    }
+
+    return errors;
+    }
     function createBookingData() {
         const ticketType = elements.ticketType.value;
         const totalPrice = state.selectedSeats.length * config.ticketPrice;
@@ -1013,7 +1176,17 @@ document.addEventListener('DOMContentLoaded', function () {
 
     window.showOrderHistory = showOrderHistory;
 
+    // 修改事件监听器设置
     function setupEventListeners() {
+        // 添加影院配置事件
+        elements.applyCinemaBtn.addEventListener('click', applyCinemaConfig);
+        
+        elements.cinemaCapacity.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                applyCinemaConfig();
+            }
+        });
+
         elements.ticketType.addEventListener('change', function () {
             if (this.value === 'individual') {
                 elements.individualForm.style.display = 'block';
@@ -1111,6 +1284,18 @@ document.addEventListener('DOMContentLoaded', function () {
         elements.cancelBtn.addEventListener('click', cancelBooking);
         elements.refundBtn.addEventListener('click', refundTicket);
 
+        //团体票提示按ctrl
+        const ticketTypeSelect = document.getElementById('ticketType');
+        const multiSelectHint = document.getElementById('multiSelectHint');
+        // 当下拉框值变化时
+        ticketTypeSelect.addEventListener('change', () => {
+            if (ticketTypeSelect.value === 'group') {
+                multiSelectHint.style.display = 'block'; // 显示提示
+            } else {
+                multiSelectHint.style.display = 'none';  // 隐藏提示
+            }
+        });
+
         canvas.addEventListener('click', handleSeatClick);
 
         elements.toggleHistoryBtn.addEventListener('click', function () {
@@ -1127,7 +1312,15 @@ document.addEventListener('DOMContentLoaded', function () {
         elements.typeFilter.addEventListener('change', updateHistoryList);
     }
 
+    // 修改初始化函数
     function initApp() {
+        const canvas = document.getElementById('cinemaCanvas');
+        const ctx = canvas.getContext('2d');
+
+        //  设置高质量渲染模式（优化抗锯齿）
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        updateCapacityDisplay();
         resizeCanvas();
         initializeSeats();
         drawSeatMap();
